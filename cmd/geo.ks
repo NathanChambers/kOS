@@ -1,2 +1,2 @@
 run once "/lib/commands".
-land2().
+geo().
