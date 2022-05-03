@@ -16,19 +16,21 @@ function launch {
 
 function lko {
     declare parameter _alt.
+    declare parameter _inclination is 0.
 
     rcs OFF.
     sas OFF.
 
     lock aoa to 90 * (1 - (ship:apoapsis / _alt)).
+    local bearing is 90 + _inclination.
 
-    lock steering to heading(90,90).
+    lock steering to heading(bearing,90).
     local throttleCtrl is 1.
     lock throttle to throttleCtrl.
 
     
     until ship:velocity:surface:mag >= 10.
-    lock steering to heading(90,aoa).
+    lock steering to heading(bearing,aoa).
 
     until ceiling(ship:apoapsis, 0) >= _alt {
         if ship:stagedeltav(ship:stagenum):current <= 0 {
@@ -91,7 +93,7 @@ function land {
 function land2 {
     sas OFF.
 
-    lock g to gforce().
+    lock g to gdrag().
     local acc is ship:availableThrust / ship:mass.
     lock vel to ship:velocity:surface:mag.
     lock radar to ship:bounds:bottomaltradar.
@@ -288,8 +290,8 @@ function exec {
     local nd is nextnode.
     print "Node in: " + round(nd:eta) + ", DeltaV: " + round(nd:deltav:mag).
 
-    lock max_acc to ship:maxthrust/ship:mass.
-    local burn_duration to nd:deltav:mag/max_acc.
+    lock acc to ship:maxthrust/ship:mass.
+    local burn_duration to nd:deltav:mag/acc.
     print "Crude Estimated burn duration: " + round(burn_duration) + "s".
 
     wait until nd:eta <= (burn_duration/2 + 60).
@@ -298,8 +300,6 @@ function exec {
     lock steering to np.
 
     wait until vang(np, ship:facing:vector) < 0.25.
-
-
     wait until nd:eta <= (burn_duration/2).
 
 
@@ -311,7 +311,7 @@ function exec {
     local dv0 to nd:deltav.
     until done
     {
-        set tset to min(nd:deltav:mag/max_acc, 1).
+        set tset to min(nd:deltav:mag/acc, 1).
 
         if vdot(dv0, nd:deltav) < 0
         {
