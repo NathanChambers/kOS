@@ -15,43 +15,55 @@ function launch {
 }
 
 function lko {
-    declare parameter _alt.
-    declare parameter _inclination is 0.
+    declare parameter orbitAlt.
 
     rcs OFF.
     sas OFF.
 
-    lock aoa to 90 * (1 - (ship:apoapsis / _alt)).
-    local bearing is 90 + _inclination.
+    lock g to gdrag().
+    lock maxAcc to ship:availablethrust / ship:mass.
+    local orbitVel is orbV(orbitAlt).
 
-    lock steering to heading(bearing,90).
     local throttleCtrl is 1.
+
+    lock dt to (ship:apoapsis + ship:verticalspeed) / orbitAlt.
+    lock aoaCtrl to 90 * (1 - dt).
+
     lock throttle to throttleCtrl.
+    lock steering to heading(90, aoaCtrl).
+    lock velRef to ship:velocity:surface.
 
-    
-    until ship:velocity:surface:mag >= 10.
-    lock steering to heading(bearing,aoa).
+    local aoaPID is pidLoop(1, 1e-5, 0.2, -g, g).
+    set aoaPID:setpoint to 0.
 
-    until ceiling(ship:apoapsis, 0) >= _alt {
+    until ship:velocity:surface:mag > 10.
+
+    local orbital is false.
+
+    until ship:apoapsis > orbitAlt {
+        set aoaPID:setpoint to aoaCtrl.
+
         if ship:stagedeltav(ship:stagenum):current <= 0 {
             wait 0.5.
             stage.
         }
 
-        local apoExp is 30/SHIP:OBT:ETA:APOAPSIS.
-        if ship:altitude > 100 {
-            if apoExp < 1 {
-                set throttleCtrl to max((1/(SHIP:OBT:ETA:APOAPSIS - 30)), 0.01) * (1-ship:q).
-            }
+        if orbital = false and vectorAngle(ship:velocity:orbit, ship:facing:forevector) < 1 {
+            lock velRef to ship:velocity:orbit.
+            set orbital to true.
         }
+
+        local aoaVel is 90 - vectorAngle(ship:up:vector, velRef).
+        local aoaThrottle is aoaPID:update(time:seconds, aoaVel).
+
+        set throttleCtrl to atc((maxAcc * (1-dt)) + aoaThrottle) * (1 - ship:q).
+
+        clearscreen.
+        print strfmt("VEL:{0} / {1}", list(round(orbitVel, 2), round(ship:velocity:orbit:mag, 2))).
+        print strfmt("ALT:{0} / {1}", list(round(orbitAlt, 2), round(ship:altitude, 2))).
+
+        wait (1/30).
     }
-
-    lock steering to ship:prograde.
-    lock throttle to 0.
-
-    until ship:altitude > body:atm:height.
-
-    hof(_alt, false).
 }
 
 function land {
