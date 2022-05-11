@@ -1,2 +1,2 @@
-run once "/lib/commands".
+run once "1:/lib/commands".
 exec().
